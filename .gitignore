@@ -1,4 +1,7 @@
 .env
+__pycache__/
+*.py[cod]
+postgres_data/
 uploads/*
 !uploads/.gitkeep
 *.gz
