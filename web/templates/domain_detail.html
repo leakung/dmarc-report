@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}{{ domain }} - DMARC Analyzer{% endblock %}
+
+{% block content %}
+<h1>Domain Analysis: {{ domain }}</h1>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>Total Reports</h3>
+        <div class="value">{{ domain_summary.total_reports }}</div>
+        <div class="subtext">
+            {{ domain_summary.first_report_date|datetime }} to<br>
+            {{ domain_summary.last_report_date|datetime }}
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Total Messages</h3>
+        <div class="value">{{ '{:,}'.format(domain_summary.total_messages) }}</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Passed</h3>
+        <div class="value">{{ '{:,}'.format(domain_summary.passed_messages) }}</div>
+        <div class="subtext">{{ domain_summary.passed_messages|percentage(domain_summary.total_messages) }}</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Failed</h3>
+        <div class="value">{{ '{:,}'.format(domain_summary.quarantined_messages + domain_summary.rejected_messages) }}</div>
+        <div class="subtext">{{ (domain_summary.quarantined_messages + domain_summary.rejected_messages)|percentage(domain_summary.total_messages) }}</div>
+    </div>
+</div>
+
+{% if timeline %}
+<div class="card">
+    <h2>Authentication Timeline (Last 30 Days)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Total</th>
+                <th>DKIM Pass</th>
+                <th>SPF Pass</th>
+                <th>Passed</th>
+                <th>Failed</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for day in timeline %}
+            <tr>
+                <td>{{ day.report_date }}</td>
+                <td>{{ '{:,}'.format(day.total_messages) }}</td>
+                <td>
+                    {{ '{:,}'.format(day.dkim_pass) }}
+                    ({{ day.dkim_pass|percentage(day.total_messages) }})
+                </td>
+                <td>
+                    {{ '{:,}'.format(day.spf_pass) }}
+                    ({{ day.spf_pass|percentage(day.total_messages) }})
+                </td>
+                <td><span class="badge badge-success">{{ '{:,}'.format(day.passed) }}</span></td>
+                <td><span class="badge badge-danger">{{ '{:,}'.format(day.failed) }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if source_ips %}
+<div class="card">
+    <h2>Source IP Analysis</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Source IP</th>
+                <th>Total Messages</th>
+                <th>DKIM Pass</th>
+                <th>SPF Pass</th>
+                <th>Reports</th>
+                <th>Last Seen</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ip in source_ips %}
+            <tr>
+                <td><span class="code">{{ ip.source_ip }}</span></td>
+                <td>{{ '{:,}'.format(ip.total_messages) }}</td>
+                <td>
+                    {{ '{:,}'.format(ip.dkim_pass) }}
+                    ({{ ip.dkim_pass|percentage(ip.total_messages) }})
+                </td>
+                <td>
+                    {{ '{:,}'.format(ip.spf_pass) }}
+                    ({{ ip.spf_pass|percentage(ip.total_messages) }})
+                </td>
+                <td>{{ ip.report_count }}</td>
+                <td>{{ ip.last_seen|datetime }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if reports %}
+<div class="card">
+    <h2>Reports for this Domain</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Organization</th>
+                <th>Date Range</th>
+                <th>Records</th>
+                <th>Messages</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for report in reports %}
+            <tr>
+                <td><a href="/report/{{ report.id }}">{{ report.id }}</a></td>
+                <td>{{ report.org_name }}</td>
+                <td>
+                    {{ report.date_range_begin|datetime }}<br>
+                    <small>to {{ report.date_range_end|datetime }}</small>
+                </td>
+                <td>{{ report.record_count }}</td>
+                <td>{{ '{:,}'.format(report.message_count) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<div style="margin-top: 1rem;">
+    <a href="/">&larr; Back to Dashboard</a>
+</div>
+
+{% endblock %}

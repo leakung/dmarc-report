@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - DMARC Analyzer{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom: 1.5rem;">Dashboard Overview</h1>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>Total Reports</h3>
+        <div class="value">{{ overall_stats.total_reports or 0 }}</div>
+        <div class="subtext">
+            {% if overall_stats.first_report_date %}
+            Since {{ overall_stats.first_report_date|datetime }}
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Monitored Domains</h3>
+        <div class="value">{{ overall_stats.total_domains or 0 }}</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Total Messages</h3>
+        <div class="value">{{ '{:,}'.format(overall_stats.total_messages or 0) }}</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Unique Source IPs</h3>
+        <div class="value">{{ '{:,}'.format(overall_stats.total_source_ips or 0) }}</div>
+    </div>
+</div>
+
+{% if disposition_stats %}
+<div class="card">
+    <h2>Message Disposition</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Disposition</th>
+                <th>Count</th>
+                <th>Percentage</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% set total = disposition_stats|sum(attribute='total') %}
+            {% for stat in disposition_stats %}
+            <tr>
+                <td>
+                    {% if stat.disposition == 'none' %}
+                    <span class="badge badge-success">{{ stat.disposition }}</span>
+                    {% elif stat.disposition == 'quarantine' %}
+                    <span class="badge badge-warning">{{ stat.disposition }}</span>
+                    {% else %}
+                    <span class="badge badge-danger">{{ stat.disposition }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ '{:,}'.format(stat.total) }}</td>
+                <td>
+                    <div class="progress-bar">
+                        <div class="progress-fill {% if stat.disposition == 'none' %}success{% elif stat.disposition == 'quarantine' %}warning{% else %}danger{% endif %}" 
+                             style="width: {{ (stat.total / total * 100)|int }}%">
+                            {{ '%.1f'|format(stat.total / total * 100) }}%
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if domain_stats %}
+<div class="card">
+    <h2>Top Domains</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Domain</th>
+                <th>Reports</th>
+                <th>Messages</th>
+                <th>Passed</th>
+                <th>Quarantined</th>
+                <th>Rejected</th>
+                <th>Last Report</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for domain in domain_stats %}
+            <tr>
+                <td><a href="/domain/{{ domain.domain }}">{{ domain.domain }}</a></td>
+                <td>{{ domain.total_reports }}</td>
+                <td>{{ '{:,}'.format(domain.total_messages) }}</td>
+                <td><span class="badge badge-success">{{ '{:,}'.format(domain.passed_messages) }}</span></td>
+                <td><span class="badge badge-warning">{{ '{:,}'.format(domain.quarantined_messages) }}</span></td>
+                <td><span class="badge badge-danger">{{ '{:,}'.format(domain.rejected_messages) }}</span></td>
+                <td>{{ domain.last_report_date|datetime }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if recent_reports %}
+<div class="card">
+    <h2>Recent Reports</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Organization</th>
+                <th>Domain</th>
+                <th>Date Range</th>
+                <th>Records</th>
+                <th>Messages</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for report in recent_reports %}
+            <tr>
+                <td><a href="/report/{{ report.id }}">{{ report.id }}</a></td>
+                <td>{{ report.org_name }}</td>
+                <td><a href="/domain/{{ report.domain }}">{{ report.domain }}</a></td>
+                <td>
+                    {{ report.date_range_begin|datetime }}<br>
+                    <small>to {{ report.date_range_end|datetime }}</small>
+                </td>
+                <td>{{ report.record_count }}</td>
+                <td>{{ '{:,}'.format(report.message_count or 0) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if not overall_stats.total_reports %}
+<div class="card">
+    <h2>No Data Available</h2>
+    <p>No DMARC reports have been imported yet. Start by:</p>
+    <ul style="margin-left: 2rem; margin-top: 1rem;">
+        <li>Configuring the IMAP fetcher to automatically retrieve reports</li>
+        <li>Using the manual import script to import local files</li>
+    </ul>
+</div>
+{% endif %}
+
+{% endblock %}

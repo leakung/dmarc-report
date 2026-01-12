@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: dmrp-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dmrp}
+      POSTGRES_USER: ${POSTGRES_USER:-dmrp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    restart: unless-stopped
+    networks:
+      - dmrp_network
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: dmrp-web
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dmrp}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-dmrp}
+      BASIC_AUTH_USERNAME: ${BASIC_AUTH_USERNAME:-admin}
+      BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD:-changeme123}
+    ports:
+      - "${WEB_PORT:-8080}:5000"
+    depends_on:
+      - postgres
+    volumes:
+      - ./web:/app
+      - ./uploads:/uploads
+      - ./manual_import.py:/manual_import.py
+      - ./fetcher:/fetcher
+    restart: unless-stopped
+    networks:
+      - dmrp_network
+
+  fetcher:
+    build:
+      context: .
+      dockerfile: Dockerfile.fetcher
+    container_name: dmrp-fetcher
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dmrp}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-dmrp}
+      IMAP_SERVER: ${IMAP_SERVER}
+      IMAP_PORT: ${IMAP_PORT:-993}
+      IMAP_USER: ${IMAP_USER}
+      IMAP_PASSWORD: ${IMAP_PASSWORD}
+      IMAP_FOLDER: ${IMAP_FOLDER:-INBOX}
+      FETCH_INTERVAL: ${FETCH_INTERVAL:-3600}
+    depends_on:
+      - postgres
+    volumes:
+      - ./fetcher:/app
+    restart: unless-stopped
+    networks:
+      - dmrp_network
+
+volumes:
+  postgres_data:
+
+networks:
+  dmrp_network:
+    driver: bridge

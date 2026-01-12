@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Report #{{ report.id }} - DMARC Analyzer{% endblock %}
+
+{% block content %}
+<h1>Report Details</h1>
+
+<div class="card">
+    <h2>Report Metadata</h2>
+    <table>
+        <tr>
+            <th>Report ID</th>
+            <td><span class="code">{{ report.report_id }}</span></td>
+        </tr>
+        <tr>
+            <th>Organization</th>
+            <td>{{ report.org_name }}</td>
+        </tr>
+        <tr>
+            <th>Email</th>
+            <td>{{ report.email }}</td>
+        </tr>
+        <tr>
+            <th>Domain</th>
+            <td><a href="/domain/{{ report.domain }}">{{ report.domain }}</a></td>
+        </tr>
+        <tr>
+            <th>Date Range</th>
+            <td>{{ report.date_range_begin|datetime }} to {{ report.date_range_end|datetime }}</td>
+        </tr>
+        <tr>
+            <th>Policy</th>
+            <td>
+                p={{ report.p }}, sp={{ report.sp }}, 
+                adkim={{ report.adkim }}, aspf={{ report.aspf }}, 
+                pct={{ report.pct }}%
+            </td>
+        </tr>
+    </table>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>Total Messages</h3>
+        <div class="value">{{ '{:,}'.format(summary.total_messages or 0) }}</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Unique Sources</h3>
+        <div class="value">{{ summary.unique_sources or 0 }}</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>DKIM Pass</h3>
+        <div class="value">{{ '{:,}'.format(summary.dkim_pass or 0) }}</div>
+        <div class="subtext">{{ summary.dkim_pass|percentage(summary.total_messages) }}</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>SPF Pass</h3>
+        <div class="value">{{ '{:,}'.format(summary.spf_pass or 0) }}</div>
+        <div class="subtext">{{ summary.spf_pass|percentage(summary.total_messages) }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Records ({{ records|length }})</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Source IP</th>
+                <th>Count</th>
+                <th>Disposition</th>
+                <th>DKIM</th>
+                <th>SPF</th>
+                <th>Header From</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in records %}
+            <tr>
+                <td><span class="code">{{ record.source_ip }}</span></td>
+                <td>{{ '{:,}'.format(record.count) }}</td>
+                <td>
+                    {% if record.disposition == 'none' %}
+                    <span class="badge badge-success">{{ record.disposition }}</span>
+                    {% elif record.disposition == 'quarantine' %}
+                    <span class="badge badge-warning">{{ record.disposition }}</span>
+                    {% else %}
+                    <span class="badge badge-danger">{{ record.disposition }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if record.dkim_result == 'pass' %}
+                    <span class="badge badge-success">{{ record.dkim_result }}</span>
+                    {% else %}
+                    <span class="badge badge-danger">{{ record.dkim_result }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if record.spf_result == 'pass' %}
+                    <span class="badge badge-success">{{ record.spf_result }}</span>
+                    {% else %}
+                    <span class="badge badge-danger">{{ record.spf_result }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ record.header_from }}</td>
+                <td>
+                    {% if record.dkim_details %}
+                    <small>DKIM: {{ record.dkim_details|join(', ') }}</small><br>
+                    {% endif %}
+                    {% if record.spf_details %}
+                    <small>SPF: {{ record.spf_details|join(', ') }}</small>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>Raw XML</h2>
+    <details>
+        <summary style="cursor: pointer; padding: 0.5rem; background: #f8f9fa; border-radius: 4px;">
+            Click to expand raw XML
+        </summary>
+        <pre style="margin-top: 1rem;">{{ report.raw_xml }}</pre>
+    </details>
+</div>
+
+<div style="margin-top: 1rem;">
+    <a href="/">&larr; Back to Dashboard</a>
+</div>
+
+{% endblock %}

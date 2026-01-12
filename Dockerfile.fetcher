@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements-fetcher.txt .
+RUN pip install --no-cache-dir -r requirements-fetcher.txt
+
+# Copy application files
+COPY fetcher/ /app/
+
+CMD ["python", "imap_fetcher.py"]

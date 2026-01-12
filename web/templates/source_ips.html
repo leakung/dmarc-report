@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Source IP Analysis - DMARC Analyzer{% endblock %}
+
+{% block content %}
+<h1>Source IP Analysis</h1>
+
+<div class="card">
+    <h2>All Source IPs (Top 100)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Source IP</th>
+                <th>Domain</th>
+                <th>Total Messages</th>
+                <th>DKIM Pass</th>
+                <th>SPF Pass</th>
+                <th>Reports</th>
+                <th>Last Seen</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ip in ips %}
+            <tr>
+                <td><span class="code">{{ ip.source_ip }}</span></td>
+                <td><a href="/domain/{{ ip.domain }}">{{ ip.domain }}</a></td>
+                <td>{{ '{:,}'.format(ip.total_messages) }}</td>
+                <td>
+                    {{ '{:,}'.format(ip.dkim_pass) }}
+                    <small>({{ ip.dkim_pass|percentage(ip.total_messages) }})</small>
+                </td>
+                <td>
+                    {{ '{:,}'.format(ip.spf_pass) }}
+                    <small>({{ ip.spf_pass|percentage(ip.total_messages) }})</small>
+                </td>
+                <td>{{ ip.report_count }}</td>
+                <td>{{ ip.last_seen|datetime }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div style="margin-top: 1rem;">
+    <a href="/">&larr; Back to Dashboard</a>
+</div>
+
+{% endblock %}
