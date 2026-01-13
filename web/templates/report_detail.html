@@ -3,13 +3,16 @@
 {% block title %}Report #{{ report.id }} - DMARC Analyzer{% endblock %}
 
 {% block content %}
-<h1>Report Details</h1>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <h1>📄 Report #{{ report.id }}</h1>
+    <a href="/export/records/{{ report.id }}" class="btn btn-success" style="text-decoration: none;">📥 Export Records CSV</a>
+</div>
 
 <div class="card">
     <h2>Report Metadata</h2>
     <table>
         <tr>
-            <th>Report ID</th>
+            <th style="width: 200px;">Report ID</th>
             <td><span class="code">{{ report.report_id }}</span></td>
         </tr>
         <tr>
@@ -29,16 +32,19 @@
             <td>{{ report.date_range_begin|datetime }} to {{ report.date_range_end|datetime }}</td>
         </tr>
         <tr>
-            <th>Policy</th>
+            <th>Policy Configuration</th>
             <td>
-                p={{ report.p }}, sp={{ report.sp }}, 
-                adkim={{ report.adkim }}, aspf={{ report.aspf }}, 
-                pct={{ report.pct }}%
+                <span class="badge badge-info">p={{ report.p }}</span>
+                <span class="badge badge-info">sp={{ report.sp }}</span>
+                <span class="badge badge-info">adkim={{ report.adkim }}</span>
+                <span class="badge badge-info">aspf={{ report.aspf }}</span>
+                <span class="badge badge-info">pct={{ report.pct }}%</span>
             </td>
         </tr>
     </table>
 </div>
 
+<!-- Statistics Grid -->
 <div class="stats-grid">
     <div class="stat-card">
         <h3>Total Messages</h3>
@@ -48,6 +54,24 @@
     <div class="stat-card">
         <h3>Unique Sources</h3>
         <div class="value">{{ summary.unique_sources or 0 }}</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Passed</h3>
+        <div class="value" style="color: #27ae60;">{{ '{:,}'.format(summary.passed or 0) }}</div>
+        <div class="subtext">{{ summary.passed|percentage(summary.total_messages) }}</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Quarantined</h3>
+        <div class="value" style="color: #f39c12;">{{ '{:,}'.format(summary.quarantined or 0) }}</div>
+        <div class="subtext">{{ summary.quarantined|percentage(summary.total_messages) }}</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Rejected</h3>
+        <div class="value" style="color: #e74c3c;">{{ '{:,}'.format(summary.rejected or 0) }}</div>
+        <div class="subtext">{{ summary.rejected|percentage(summary.total_messages) }}</div>
     </div>
     
     <div class="stat-card">
@@ -63,9 +87,68 @@
     </div>
 </div>
 
+<!-- Authentication Results Chart -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+    <div class="card">
+        <h2>Disposition Breakdown</h2>
+        <div class="chart-container">
+            <canvas id="dispositionChart"></canvas>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>Authentication Results</h2>
+        <div class="chart-container">
+            <canvas id="authChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Records Table with Filter -->
 <div class="card">
-    <h2>Records ({{ records|length }})</h2>
-    <table>
+    <h2>📋 Records ({{ records|length }})</h2>
+    
+    <div class="filter-section" style="margin-top: 1rem;">
+        <div class="filter-grid" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="form-group">
+                <label for="filterIP">Filter by IP</label>
+                <input type="text" id="filterIP" placeholder="e.g., 192.168" onkeyup="filterRecords()">
+            </div>
+            
+            <div class="form-group">
+                <label for="filterDisposition">Disposition</label>
+                <select id="filterDisposition" onchange="filterRecords()">
+                    <option value="">All</option>
+                    <option value="none">None</option>
+                    <option value="quarantine">Quarantine</option>
+                    <option value="reject">Reject</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="filterDKIM">DKIM Result</label>
+                <select id="filterDKIM" onchange="filterRecords()">
+                    <option value="">All</option>
+                    <option value="pass">Pass</option>
+                    <option value="fail">Fail</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="filterSPF">SPF Result</label>
+                <select id="filterSPF" onchange="filterRecords()">
+                    <option value="">All</option>
+                    <option value="pass">Pass</option>
+                    <option value="fail">Fail</option>
+                </select>
+            </div>
+        </div>
+        <div style="margin-top: 0.5rem;">
+            <small id="filterCount">Showing all {{ records|length }} records</small>
+        </div>
+    </div>
+    
+    <table id="recordsTable" style="margin-top: 1rem;">
         <thead>
             <tr>
                 <th>Source IP</th>
@@ -74,14 +157,18 @@
                 <th>DKIM</th>
                 <th>SPF</th>
                 <th>Header From</th>
-                <th>Details</th>
+                <th>Authentication Details</th>
             </tr>
         </thead>
         <tbody>
             {% for record in records %}
-            <tr>
+            <tr class="record-row" 
+                data-ip="{{ record.source_ip }}" 
+                data-disposition="{{ record.disposition }}"
+                data-dkim="{{ record.dkim_result }}"
+                data-spf="{{ record.spf_result }}">
                 <td><span class="code">{{ record.source_ip }}</span></td>
-                <td>{{ '{:,}'.format(record.count) }}</td>
+                <td><strong>{{ '{:,}'.format(record.count) }}</strong></td>
                 <td>
                     {% if record.disposition == 'none' %}
                     <span class="badge badge-success">{{ record.disposition }}</span>
@@ -93,25 +180,34 @@
                 </td>
                 <td>
                     {% if record.dkim_result == 'pass' %}
-                    <span class="badge badge-success">{{ record.dkim_result }}</span>
+                    <span class="badge badge-success">✓ {{ record.dkim_result }}</span>
                     {% else %}
-                    <span class="badge badge-danger">{{ record.dkim_result }}</span>
+                    <span class="badge badge-danger">✗ {{ record.dkim_result }}</span>
                     {% endif %}
                 </td>
                 <td>
                     {% if record.spf_result == 'pass' %}
-                    <span class="badge badge-success">{{ record.spf_result }}</span>
+                    <span class="badge badge-success">✓ {{ record.spf_result }}</span>
                     {% else %}
-                    <span class="badge badge-danger">{{ record.spf_result }}</span>
+                    <span class="badge badge-danger">✗ {{ record.spf_result }}</span>
                     {% endif %}
                 </td>
                 <td>{{ record.header_from }}</td>
                 <td>
                     {% if record.dkim_details %}
-                    <small>DKIM: {{ record.dkim_details|join(', ') }}</small><br>
-                    {% endif %}
-                    {% if record.spf_details %}
-                    <small>SPF: {{ record.spf_details|join(', ') }}</small>
+                    <details style="cursor: pointer;">
+                        <summary style="color: #3498db;">View Details</summary>
+                        <div style="margin-top: 0.5rem;">
+                            {% if record.dkim_details %}
+                            <strong>DKIM:</strong> {{ record.dkim_details|join(', ') }}<br>
+                            {% endif %}
+                            {% if record.spf_details %}
+                            <strong>SPF:</strong> {{ record.spf_details|join(', ') }}
+                            {% endif %}
+                        </div>
+                    </details>
+                    {% else %}
+                    <small style="color: #95a5a6;">No additional details</small>
                     {% endif %}
                 </td>
             </tr>
@@ -121,17 +217,120 @@
 </div>
 
 <div class="card">
-    <h2>Raw XML</h2>
+    <h2>📄 Raw XML Report</h2>
     <details>
-        <summary style="cursor: pointer; padding: 0.5rem; background: #f8f9fa; border-radius: 4px;">
+        <summary style="cursor: pointer; padding: 0.5rem; background: #f8f9fa; border-radius: 4px; font-weight: 500;">
             Click to expand raw XML
         </summary>
-        <pre style="margin-top: 1rem;">{{ report.raw_xml }}</pre>
+        <pre style="margin-top: 1rem; max-height: 500px; overflow-y: auto;">{{ report.raw_xml }}</pre>
     </details>
 </div>
 
-<div style="margin-top: 1rem;">
-    <a href="/">&larr; Back to Dashboard</a>
+<div style="margin-top: 1.5rem;">
+    <a href="/" class="btn btn-secondary" style="text-decoration: none;">&larr; Back to Dashboard</a>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+// Disposition Chart
+const dispositionCtx = document.getElementById('dispositionChart').getContext('2d');
+new Chart(dispositionCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Passed', 'Quarantined', 'Rejected'],
+        datasets: [{
+            data: [
+                {{ summary.passed or 0 }},
+                {{ summary.quarantined or 0 }},
+                {{ summary.rejected or 0 }}
+            ],
+            backgroundColor: ['#27ae60', '#f39c12', '#e74c3c']
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Authentication Chart
+const authCtx = document.getElementById('authChart').getContext('2d');
+new Chart(authCtx, {
+    type: 'bar',
+    data: {
+        labels: ['DKIM', 'SPF'],
+        datasets: [
+            {
+                label: 'Pass',
+                data: [{{ summary.dkim_pass or 0 }}, {{ summary.spf_pass or 0 }}],
+                backgroundColor: '#27ae60'
+            },
+            {
+                label: 'Fail',
+                data: [
+                    {{ (summary.total_messages or 0) - (summary.dkim_pass or 0) }},
+                    {{ (summary.total_messages or 0) - (summary.spf_pass or 0) }}
+                ],
+                backgroundColor: '#e74c3c'
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        },
+        scales: {
+            x: {
+                stacked: true
+            },
+            y: {
+                stacked: true,
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Filter Records Function
+function filterRecords() {
+    const ipFilter = document.getElementById('filterIP').value.toLowerCase();
+    const dispositionFilter = document.getElementById('filterDisposition').value;
+    const dkimFilter = document.getElementById('filterDKIM').value;
+    const spfFilter = document.getElementById('filterSPF').value;
+    
+    const rows = document.querySelectorAll('.record-row');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const ip = row.dataset.ip.toLowerCase();
+        const disposition = row.dataset.disposition;
+        const dkim = row.dataset.dkim;
+        const spf = row.dataset.spf;
+        
+        const matchIP = !ipFilter || ip.includes(ipFilter);
+        const matchDisposition = !dispositionFilter || disposition === dispositionFilter;
+        const matchDKIM = !dkimFilter || dkim === dkimFilter;
+        const matchSPF = !spfFilter || spf === spfFilter;
+        
+        if (matchIP && matchDisposition && matchDKIM && matchSPF) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    document.getElementById('filterCount').textContent = 
+        `Showing ${visibleCount} of {{ records|length }} records`;
+}
 {% endblock %}

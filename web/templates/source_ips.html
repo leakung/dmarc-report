@@ -3,46 +3,163 @@
 {% block title %}Source IP Analysis - DMARC Analyzer{% endblock %}
 
 {% block content %}
-<h1>Source IP Analysis</h1>
+<h1>🌐 Source IP Analysis</h1>
+
+<div class="card" style="background: #e8f4f8; border-left: 4px solid #3498db;">
+    <h3 style="margin-bottom: 0.5rem;">💡 What is Source IP Analysis?</h3>
+    <p style="margin: 0; color: #2c3e50;">
+        Source IPs show which mail servers are sending emails on behalf of your domains. 
+        Click on any IP to see detailed history including which reports and dates it appeared in.
+        <strong>Look for:</strong> Unknown IPs, low authentication rates, or suspicious patterns.
+    </p>
+</div>
 
 <div class="card">
-    <h2>All Source IPs (Top 100)</h2>
-    <table>
+    <h2>📋 All Source IPs (Top 100 by Message Volume)</h2>
+    
+    <div class="filter-section" style="margin-bottom: 1rem;">
+        <div class="filter-grid" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="form-group">
+                <label for="filterIP">Filter by IP</label>
+                <input type="text" id="filterIP" placeholder="e.g., 192.168" onkeyup="filterIPs()">
+            </div>
+            
+            <div class="form-group">
+                <label for="filterDomain">Filter by Domain</label>
+                <input type="text" id="filterDomain" placeholder="e.g., example.com" onkeyup="filterIPs()">
+            </div>
+            
+            <div class="form-group">
+                <label for="filterAuth">Authentication Status</label>
+                <select id="filterAuth" onchange="filterIPs()">
+                    <option value="">All</option>
+                    <option value="good">Good (>80% pass)</option>
+                    <option value="warning">Warning (50-80% pass)</option>
+                    <option value="bad">Poor (<50% pass)</option>
+                </select>
+            </div>
+        </div>
+        <small id="filterCount">Showing all {{ ips|length }} IPs</small>
+    </div>
+    
+    <table id="ipsTable">
         <thead>
             <tr>
                 <th>Source IP</th>
                 <th>Domain</th>
                 <th>Total Messages</th>
-                <th>DKIM Pass</th>
-                <th>SPF Pass</th>
+                <th>DKIM Pass Rate</th>
+                <th>SPF Pass Rate</th>
                 <th>Reports</th>
                 <th>Last Seen</th>
+                <th>Health</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             {% for ip in ips %}
-            <tr>
-                <td><span class="code">{{ ip.source_ip }}</span></td>
-                <td><a href="/domain/{{ ip.domain }}">{{ ip.domain }}</a></td>
-                <td>{{ '{:,}'.format(ip.total_messages) }}</td>
+            {% set dkim_rate = (ip.dkim_pass / ip.total_messages * 100) if ip.total_messages > 0 else 0 %}
+            {% set spf_rate = (ip.spf_pass / ip.total_messages * 100) if ip.total_messages > 0 else 0 %}
+            {% set avg_rate = (dkim_rate + spf_rate) / 2 %}
+            <tr class="ip-row" 
+                data-ip="{{ ip.source_ip }}" 
+                data-domain="{{ ip.domain }}"
+                data-auth-rate="{{ avg_rate }}">
                 <td>
-                    {{ '{:,}'.format(ip.dkim_pass) }}
-                    <small>({{ ip.dkim_pass|percentage(ip.total_messages) }})</small>
+                    <a href="/source-ip/{{ ip.source_ip }}" style="font-family: monospace; font-weight: 600;">
+                        {{ ip.source_ip }}
+                    </a>
+                </td>
+                <td><a href="/domain/{{ ip.domain }}">{{ ip.domain }}</a></td>
+                <td><strong>{{ '{:,}'.format(ip.total_messages) }}</strong></td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div class="progress-bar" style="flex: 1; height: 16px;">
+                            <div class="progress-fill {% if dkim_rate >= 80 %}success{% elif dkim_rate >= 50 %}warning{% else %}danger{% endif %}" 
+                                 style="width: {{ dkim_rate|int }}%">
+                                {{ '%.1f'|format(dkim_rate) }}%
+                            </div>
+                        </div>
+                        <small>{{ '{:,}'.format(ip.dkim_pass) }}/{{ '{:,}'.format(ip.total_messages) }}</small>
+                    </div>
                 </td>
                 <td>
-                    {{ '{:,}'.format(ip.spf_pass) }}
-                    <small>({{ ip.spf_pass|percentage(ip.total_messages) }})</small>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div class="progress-bar" style="flex: 1; height: 16px;">
+                            <div class="progress-fill {% if spf_rate >= 80 %}success{% elif spf_rate >= 50 %}warning{% else %}danger{% endif %}" 
+                                 style="width: {{ spf_rate|int }}%">
+                                {{ '%.1f'|format(spf_rate) }}%
+                            </div>
+                        </div>
+                        <small>{{ '{:,}'.format(ip.spf_pass) }}/{{ '{:,}'.format(ip.total_messages) }}</small>
+                    </div>
                 </td>
                 <td>{{ ip.report_count }}</td>
                 <td>{{ ip.last_seen|datetime }}</td>
+                <td>
+                    {% if avg_rate >= 80 %}
+                    <span class="badge badge-success">✓ Healthy</span>
+                    {% elif avg_rate >= 50 %}
+                    <span class="badge badge-warning">⚠ Warning</span>
+                    {% else %}
+                    <span class="badge badge-danger">✗ Poor</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="/source-ip/{{ ip.source_ip }}" class="btn btn-primary" style="padding: 0.25rem 0.75rem; text-decoration: none; font-size: 0.85rem;">
+                        View Details
+                    </a>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
 
-<div style="margin-top: 1rem;">
-    <a href="/">&larr; Back to Dashboard</a>
+<div class="card" style="background: #fff9e6; border-left: 4px solid #f39c12;">
+    <h3 style="margin-bottom: 0.5rem;">📖 How to Interpret This Data</h3>
+    <ul style="margin: 0.5rem 0; padding-left: 2rem;">
+        <li><strong>Healthy (>80% pass):</strong> IP is properly configured and trusted</li>
+        <li><strong>Warning (50-80% pass):</strong> Some authentication issues - needs review</li>
+        <li><strong>Poor (<50% pass):</strong> Serious issues - likely unauthorized or misconfigured</li>
+        <li><strong>High message volume with low auth:</strong> Possible spam or spoofing attempt</li>
+        <li><strong>Click "View Details"</strong> to see the full history with dates and specific reports</li>
+    </ul>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+function filterIPs() {
+    const ipFilter = document.getElementById('filterIP').value.toLowerCase();
+    const domainFilter = document.getElementById('filterDomain').value.toLowerCase();
+    const authFilter = document.getElementById('filterAuth').value;
+    
+    const rows = document.querySelectorAll('.ip-row');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const ip = row.dataset.ip.toLowerCase();
+        const domain = row.dataset.domain.toLowerCase();
+        const authRate = parseFloat(row.dataset.authRate);
+        
+        const matchIP = !ipFilter || ip.includes(ipFilter);
+        const matchDomain = !domainFilter || domain.includes(domainFilter);
+        
+        let matchAuth = true;
+        if (authFilter === 'good') matchAuth = authRate >= 80;
+        else if (authFilter === 'warning') matchAuth = authRate >= 50 && authRate < 80;
+        else if (authFilter === 'bad') matchAuth = authRate < 50;
+        
+        if (matchIP && matchDomain && matchAuth) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    document.getElementById('filterCount').textContent = 
+        `Showing ${visibleCount} of {{ ips|length }} IPs`;
+}
 {% endblock %}

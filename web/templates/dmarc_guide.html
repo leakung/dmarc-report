@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}DMARC Guide - Understanding Your Reports{% endblock %}
+
+{% block content %}
+<h1>📚 DMARC Guide - Understanding Your Reports</h1>
+
+<div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+    <h2 style="color: white;">What is DMARC?</h2>
+    <p style="font-size: 1.1rem; margin: 0;">
+        <strong>DMARC (Domain-based Message Authentication, Reporting & Conformance)</strong> is an email authentication protocol 
+        that helps protect your domain from email spoofing and phishing attacks. It builds on SPF and DKIM to give domain 
+        owners control over how unauthenticated emails are handled.
+    </p>
+</div>
+
+<!-- Key Concepts -->
+<div class="card">
+    <h2>🔑 Key Concepts You Need to Know</h2>
+    
+    <div style="display: grid; gap: 1.5rem; margin-top: 1rem;">
+        <!-- DKIM -->
+        <div style="border-left: 4px solid #3498db; padding-left: 1rem; background: #f8f9fa; padding: 1rem;">
+            <h3 style="color: #3498db; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">✍️</span> DKIM (DomainKeys Identified Mail)
+            </h3>
+            <p><strong>What it does:</strong> Adds a digital signature to emails to verify they haven't been tampered with.</p>
+            <p><strong>How to read it:</strong></p>
+            <ul style="margin-left: 1.5rem;">
+                <li><span class="badge badge-success">pass</span> = Email signature is valid</li>
+                <li><span class="badge badge-danger">fail</span> = Signature invalid or missing</li>
+                <li><strong>Why it matters:</strong> Proves the email actually came from your domain</li>
+            </ul>
+            <p><strong>In the reports:</strong> Look for "DKIM Pass Rate" - should be >95% for legitimate senders</p>
+        </div>
+        
+        <!-- SPF -->
+        <div style="border-left: 4px solid #27ae60; padding-left: 1rem; background: #f8f9fa; padding: 1rem;">
+            <h3 style="color: #27ae60; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">📋</span> SPF (Sender Policy Framework)
+            </h3>
+            <p><strong>What it does:</strong> Lists which mail servers are allowed to send email for your domain.</p>
+            <p><strong>How to read it:</strong></p>
+            <ul style="margin-left: 1.5rem;">
+                <li><span class="badge badge-success">pass</span> = Email from authorized server</li>
+                <li><span class="badge badge-danger">fail</span> = Email from unauthorized server</li>
+                <li><strong>Why it matters:</strong> Prevents spammers from using your domain name</li>
+            </ul>
+            <p><strong>In the reports:</strong> Look for "SPF Pass Rate" - failing IPs might be unauthorized</p>
+        </div>
+        
+        <!-- Disposition -->
+        <div style="border-left: 4px solid #f39c12; padding-left: 1rem; background: #f8f9fa; padding: 1rem;">
+            <h3 style="color: #f39c12; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">🎯</span> Disposition (What Happened to the Email)
+            </h3>
+            <p><strong>What it means:</strong> The action taken by the receiving server based on DMARC policy.</p>
+            <ul style="margin-left: 1.5rem;">
+                <li><span class="badge badge-success">none</span> = Email delivered normally (authentication passed)</li>
+                <li><span class="badge badge-warning">quarantine</span> = Email sent to spam/junk folder</li>
+                <li><span class="badge badge-danger">reject</span> = Email completely blocked</li>
+            </ul>
+            <p><strong>In the reports:</strong> High quarantine/reject numbers mean emails are being blocked</p>
+        </div>
+        
+        <!-- Policy -->
+        <div style="border-left: 4px solid #9b59b6; padding-left: 1rem; background: #f8f9fa; padding: 1rem;">
+            <h3 style="color: #9b59b6; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">🛡️</span> DMARC Policy (p=)
+            </h3>
+            <p><strong>What it controls:</strong> Tells receivers what to do with emails that fail authentication.</p>
+            <ul style="margin-left: 1.5rem;">
+                <li><code>p=none</code> = Monitor only (no action taken) - <strong>Start here</strong></li>
+                <li><code>p=quarantine</code> = Send to spam if authentication fails - <strong>Intermediate</strong></li>
+                <li><code>p=reject</code> = Block completely if authentication fails - <strong>Strongest protection</strong></li>
+            </ul>
+            <p><strong>Recommendation:</strong> Start with "none", monitor reports, then gradually move to "reject"</p>
+        </div>
+    </div>
+</div>
+
+<!-- How to Read Reports -->
+<div class="card">
+    <h2>📖 How to Read Your DMARC Reports</h2>
+    
+    <h3 style="margin-top: 1.5rem;">1. Dashboard Overview</h3>
+    <ul style="margin-left: 2rem;">
+        <li><strong>Total Reports:</strong> Number of reports received from email providers (Google, Yahoo, etc.)</li>
+        <li><strong>Monitored Domains:</strong> Your domains being tracked</li>
+        <li><strong>Total Messages:</strong> How many emails were analyzed</li>
+        <li><strong>Disposition Chart:</strong> Quick view of how many emails passed vs. failed</li>
+    </ul>
+    
+    <h3 style="margin-top: 1.5rem;">2. Individual Report Details</h3>
+    <ul style="margin-left: 2rem;">
+        <li><strong>Organization:</strong> Who sent the report (e.g., "google.com", "yahoo.com")</li>
+        <li><strong>Date Range:</strong> Period covered by the report (usually 24 hours)</li>
+        <li><strong>Records:</strong> Individual source IPs that sent emails</li>
+        <li><strong>Each Record Shows:</strong>
+            <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                <li>Source IP: The mail server that sent the email</li>
+                <li>Count: How many emails from this IP</li>
+                <li>Disposition: What happened to them</li>
+                <li>DKIM/SPF Results: Whether authentication passed</li>
+            </ul>
+        </li>
+    </ul>
+    
+    <h3 style="margin-top: 1.5rem;">3. Source IP Analysis</h3>
+    <ul style="margin-left: 2rem;">
+        <li><strong>Click any IP</strong> to see its complete history</li>
+        <li><strong>Health Status:</strong>
+            <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                <li><span class="badge badge-success">Healthy (>80%)</span> = Properly configured, authorized sender</li>
+                <li><span class="badge badge-warning">Warning (50-80%)</span> = Needs investigation</li>
+                <li><span class="badge badge-danger">Poor (<50%)</span> = Likely unauthorized or misconfigured</li>
+            </ul>
+        </li>
+        <li><strong>View timeline</strong> to see which dates the IP was active</li>
+    </ul>
+</div>
+
+<!-- Common Scenarios -->
+<div class="card">
+    <h2>🎯 Common Scenarios & What to Do</h2>
+    
+    <div style="display: grid; gap: 1.5rem; margin-top: 1rem;">
+        <!-- Scenario 1 -->
+        <div style="background: #d4edda; padding: 1rem; border-radius: 8px; border-left: 4px solid #27ae60;">
+            <h3 style="color: #155724;">✓ Scenario: Everything Passing</h3>
+            <p><strong>What you see:</strong> >95% of messages show "none" disposition, high DKIM/SPF pass rates</p>
+            <p><strong>What it means:</strong> Your email authentication is working correctly!</p>
+            <p><strong>What to do:</strong> 
+                <ul style="margin-left: 1.5rem;">
+                    <li>Continue monitoring regularly</li>
+                    <li>If you're on p=none, consider moving to p=quarantine</li>
+                    <li>After 30 days of clean reports, move to p=reject</li>
+                </ul>
+            </p>
+        </div>
+        
+        <!-- Scenario 2 -->
+        <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; border-left: 4px solid #f39c12;">
+            <h3 style="color: #856404;">⚠ Scenario: Unknown IP Sending with Failures</h3>
+            <p><strong>What you see:</strong> IP you don't recognize, low DKIM/SPF pass rates</p>
+            <p><strong>What it means:</strong> Could be unauthorized sender or spoofing attempt</p>
+            <p><strong>What to do:</strong>
+                <ul style="margin-left: 1.5rem;">
+                    <li><strong>Step 1:</strong> Click the IP to see full history and dates</li>
+                    <li><strong>Step 2:</strong> Use IP lookup tools to identify the server</li>
+                    <li><strong>Step 3:</strong> If unauthorized, this is why you need DMARC!</li>
+                    <li><strong>Step 4:</strong> Move to p=reject policy to block such emails</li>
+                </ul>
+            </p>
+        </div>
+        
+        <!-- Scenario 3 -->
+        <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; border-left: 4px solid #f39c12;">
+            <h3 style="color: #856404;">⚠ Scenario: Legitimate Service Failing</h3>
+            <p><strong>What you see:</strong> Recognized service (marketing platform, help desk) with DKIM/SPF failures</p>
+            <p><strong>What it means:</strong> Service is misconfigured or you haven't authorized it</p>
+            <p><strong>What to do:</strong>
+                <ul style="margin-left: 1.5rem;">
+                    <li><strong>Step 1:</strong> Check service documentation for required SPF/DKIM settings</li>
+                    <li><strong>Step 2:</strong> Add their servers to your SPF record</li>
+                    <li><strong>Step 3:</strong> Enable DKIM signing in their platform</li>
+                    <li><strong>Step 4:</strong> Monitor for 7 days to verify fixes</li>
+                </ul>
+            </p>
+        </div>
+        
+        <!-- Scenario 4 -->
+        <div style="background: #f8d7da; padding: 1rem; border-radius: 8px; border-left: 4px solid #e74c3c;">
+            <h3 style="color: #721c24;">✗ Scenario: High Quarantine/Reject Rates</h3>
+            <p><strong>What you see:</strong> Many messages in quarantine or reject disposition</p>
+            <p><strong>What it means:</strong> Your emails are being blocked by receivers!</p>
+            <p><strong>What to do - URGENT:</strong>
+                <ul style="margin-left: 1.5rem;">
+                    <li><strong>Immediate:</strong> Review all failing IPs in detail</li>
+                    <li><strong>Check:</strong> Are they your servers? If yes, fix DKIM/SPF</li>
+                    <li><strong>Fix:</strong> Update DNS records (SPF, DKIM) as needed</li>
+                    <li><strong>Test:</strong> Send test emails and verify authentication</li>
+                    <li><strong>Monitor:</strong> Watch for improvements over next 48 hours</li>
+                </ul>
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Step-by-Step Workflow -->
+<div class="card">
+    <h2>📝 Weekly Monitoring Workflow</h2>
+    <ol style="margin-left: 2rem; font-size: 1.05rem; line-height: 2;">
+        <li><strong>Check Dashboard:</strong> Look at overall trends and disposition chart</li>
+        <li><strong>Review Insights:</strong> Click "Insights" to see automated recommendations</li>
+        <li><strong>Investigate Source IPs:</strong> Click on any new or suspicious IPs</li>
+        <li><strong>Check IP History:</strong> See which dates they appeared and authentication results</li>
+        <li><strong>Take Action:</strong> Fix configurations or block unauthorized senders</li>
+        <li><strong>Export Data:</strong> Download CSV for record-keeping or deeper analysis</li>
+        <li><strong>Document Changes:</strong> Keep notes on what you fixed and when</li>
+    </ol>
+</div>
+
+<!-- Quick Reference -->
+<div class="card" style="background: #2c3e50; color: white;">
+    <h2 style="color: white;">⚡ Quick Reference Card</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1rem;">
+        <div>
+            <h3 style="color: #3498db;">✓ Good Signs</h3>
+            <ul style="line-height: 2;">
+                <li>DKIM/SPF pass rates >95%</li>
+                <li>Most disposition = "none"</li>
+                <li>All IPs are recognized</li>
+                <li>Consistent daily patterns</li>
+            </ul>
+        </div>
+        <div>
+            <h3 style="color: #e74c3c;">✗ Warning Signs</h3>
+            <ul style="line-height: 2;">
+                <li>Unknown IP addresses</li>
+                <li>Low authentication rates</li>
+                <li>High quarantine/reject</li>
+                <li>Sudden spikes in volume</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.2);">
+        <h3 style="color: #2ecc71;">🎯 Target Metrics</h3>
+        <ul style="line-height: 2;">
+            <li><strong>DKIM Pass:</strong> >95%</li>
+            <li><strong>SPF Pass:</strong> >95%</li>
+            <li><strong>Disposition "none":</strong> >95%</li>
+            <li><strong>Unknown IPs:</strong> 0</li>
+        </ul>
+    </div>
+</div>
+
+<!-- Resources -->
+<div class="card">
+    <h2>🔗 Additional Resources</h2>
+    <ul style="margin-left: 2rem; line-height: 2;">
+        <li><a href="https://dmarc.org/" target="_blank">DMARC.org</a> - Official DMARC documentation</li>
+        <li><a href="https://mxtoolbox.com/dmarc.aspx" target="_blank">MXToolbox DMARC</a> - Test your DMARC record</li>
+        <li><a href="https://dmarcian.com/dmarc-inspector/" target="_blank">DMARC Inspector</a> - Verify configuration</li>
+        <li><strong>In this tool:</strong>
+            <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                <li><a href="/">Dashboard</a> - View all reports</li>
+                <li><a href="/source-ips">Source IPs</a> - Analyze mail servers</li>
+                <li><a href="/insights">Insights</a> - Get recommendations</li>
+            </ul>
+        </li>
+    </ul>
+</div>
+
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Insights & Recommendations - DMARC Analyzer{% endblock %}
+
+{% block content %}
+<h1>💡 Insights & Recommendations</h1>
+
+<div class="card" style="background: #e8f4f8; border-left: 4px solid #3498db;">
+    <h3 style="margin-bottom: 0.5rem;">🤖 Automated Analysis</h3>
+    <p style="margin: 0; color: #2c3e50;">
+        This page automatically analyzes your DMARC data and provides actionable recommendations.
+        Issues are categorized by severity to help you prioritize.
+    </p>
+</div>
+
+{% if not insights %}
+<div class="card" style="background: #d4edda; border-left: 4px solid #27ae60;">
+    <h2>✓ All Clear!</h2>
+    <p>No major issues detected in your DMARC reports. Your email authentication appears to be working well.</p>
+    <ul style="margin-left: 2rem; margin-top: 1rem;">
+        <li>Continue monitoring regularly</li>
+        <li>Check the dashboard for ongoing trends</li>
+        <li>Review the DMARC Guide for best practices</li>
+    </ul>
+</div>
+{% else %}
+
+<!-- Insights -->
+{% for insight in insights %}
+<div class="card" style="background: {% if insight.type == 'danger' %}#f8d7da{% elif insight.type == 'warning' %}#fff3cd{% else %}#d1ecf1{% endif %}; 
+                           border-left: 4px solid {% if insight.type == 'danger' %}#e74c3c{% elif insight.type == 'warning' %}#f39c12{% else %}#3498db{% endif %};">
+    <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+        {% if insight.type == 'danger' %}
+        <span style="font-size: 1.5rem;">🚨</span>
+        {% elif insight.type == 'warning' %}
+        <span style="font-size: 1.5rem;">⚠️</span>
+        {% else %}
+        <span style="font-size: 1.5rem;">ℹ️</span>
+        {% endif %}
+        {{ insight.title }}
+    </h2>
+    
+    <p style="font-size: 1.05rem; margin: 0.5rem 0;">{{ insight.description }}</p>
+    
+    {% if insight.data %}
+    <details style="margin-top: 1rem;">
+        <summary style="cursor: pointer; padding: 0.5rem; background: rgba(255,255,255,0.7); border-radius: 4px; font-weight: 500;">
+            View {{ insight.data|length }} affected item(s)
+        </summary>
+        <div style="margin-top: 1rem;">
+            <table style="background: white;">
+                <thead>
+                    <tr>
+                        {% if 'domain' in insight.data[0] %}
+                        <th>Domain</th>
+                        {% endif %}
+                        {% if 'source_ip' in insight.data[0] %}
+                        <th>Source IP</th>
+                        {% endif %}
+                        {% if 'total_messages' in insight.data[0] %}
+                        <th>Messages</th>
+                        {% endif %}
+                        {% if 'failure_rate' in insight.data[0] %}
+                        <th>Failure Rate</th>
+                        {% endif %}
+                        {% if 'dkim_pass_rate' in insight.data[0] %}
+                        <th>DKIM Pass Rate</th>
+                        {% endif %}
+                        {% if 'spf_pass_rate' in insight.data[0] %}
+                        <th>SPF Pass Rate</th>
+                        {% endif %}
+                        {% if 'policy' in insight.data[0] %}
+                        <th>Current Policy</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in insight.data %}
+                    <tr>
+                        {% if 'domain' in item %}
+                        <td><a href="/domain/{{ item.domain }}">{{ item.domain }}</a></td>
+                        {% endif %}
+                        {% if 'source_ip' in item %}
+                        <td><a href="/source-ip/{{ item.source_ip }}">{{ item.source_ip }}</a></td>
+                        {% endif %}
+                        {% if 'total_messages' in item %}
+                        <td>{{ '{:,}'.format(item.total_messages) }}</td>
+                        {% endif %}
+                        {% if 'failure_rate' in item %}
+                        <td><span class="badge badge-danger">{{ item.failure_rate }}%</span></td>
+                        {% endif %}
+                        {% if 'dkim_pass_rate' in item %}
+                        <td><span class="badge {% if item.dkim_pass_rate >= 80 %}badge-success{% elif item.dkim_pass_rate >= 50 %}badge-warning{% else %}badge-danger{% endif %}">
+                            {{ item.dkim_pass_rate }}%
+                        </span></td>
+                        {% endif %}
+                        {% if 'spf_pass_rate' in item %}
+                        <td><span class="badge {% if item.spf_pass_rate >= 80 %}badge-success{% elif item.spf_pass_rate >= 50 %}badge-warning{% else %}badge-danger{% endif %}">
+                            {{ item.spf_pass_rate }}%
+                        </span></td>
+                        {% endif %}
+                        {% if 'policy' in item %}
+                        <td><span class="code">p={{ item.policy }}</span></td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+    {% endif %}
+    
+    <div style="margin-top: 1rem; padding: 1rem; background: rgba(255,255,255,0.7); border-radius: 4px;">
+        <strong>💡 Recommendation:</strong>
+        <p style="margin: 0.5rem 0 0 0;">{{ insight.recommendation }}</p>
+    </div>
+</div>
+{% endfor %}
+
+{% endif %}
+
+<!-- Quick Actions -->
+<div class="card">
+    <h2>🔧 Quick Actions</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+        <a href="/" style="text-decoration: none;">
+            <div style="padding: 1.5rem; background: #3498db; color: white; border-radius: 8px; text-align: center;">
+                <div style="font-size: 2rem;">📊</div>
+                <div style="font-weight: 600; margin-top: 0.5rem;">View Dashboard</div>
+                <div style="font-size: 0.9rem; opacity: 0.9;">Overall statistics</div>
+            </div>
+        </a>
+        
+        <a href="/source-ips" style="text-decoration: none;">
+            <div style="padding: 1.5rem; background: #27ae60; color: white; border-radius: 8px; text-align: center;">
+                <div style="font-size: 2rem;">🌐</div>
+                <div style="font-weight: 600; margin-top: 0.5rem;">Check Source IPs</div>
+                <div style="font-size: 0.9rem; opacity: 0.9;">Analyze mail servers</div>
+            </div>
+        </a>
+        
+        <a href="/guide" style="text-decoration: none;">
+            <div style="padding: 1.5rem; background: #9b59b6; color: white; border-radius: 8px; text-align: center;">
+                <div style="font-size: 2rem;">📚</div>
+                <div style="font-weight: 600; margin-top: 0.5rem;">Read DMARC Guide</div>
+                <div style="font-size: 0.9rem; opacity: 0.9;">Learn best practices</div>
+            </div>
+        </a>
+        
+        <a href="/export/reports" style="text-decoration: none;">
+            <div style="padding: 1.5rem; background: #e67e22; color: white; border-radius: 8px; text-align: center;">
+                <div style="font-size: 2rem;">📥</div>
+                <div style="font-weight: 600; margin-top: 0.5rem;">Export Data</div>
+                <div style="font-size: 0.9rem; opacity: 0.9;">Download CSV</div>
+            </div>
+        </a>
+    </div>
+</div>
+
+{% endblock %}

@@ -3,8 +3,9 @@
 {% block title %}Dashboard - DMARC Analyzer{% endblock %}
 
 {% block content %}
-<h1 style="margin-bottom: 1.5rem;">Dashboard Overview</h1>
+<h1 style="margin-bottom: 1.5rem;">📊 Dashboard Overview</h1>
 
+<!-- Overall Statistics -->
 <div class="stats-grid">
     <div class="stat-card">
         <h3>Total Reports</h3>
@@ -32,9 +33,28 @@
     </div>
 </div>
 
+<!-- Charts Row -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+    {% if disposition_stats %}
+    <div class="card">
+        <h2>Message Disposition Distribution</h2>
+        <div class="chart-container">
+            <canvas id="dispositionChart"></canvas>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="card">
+        <h2>Last 30 Days Trend</h2>
+        <div class="chart-container">
+            <canvas id="timelineChart"></canvas>
+        </div>
+    </div>
+</div>
+
 {% if disposition_stats %}
 <div class="card">
-    <h2>Message Disposition</h2>
+    <h2>Message Disposition Breakdown</h2>
     <table>
         <thead>
             <tr>
@@ -104,10 +124,60 @@
 </div>
 {% endif %}
 
-{% if recent_reports %}
+<!-- Filter and Search Section -->
 <div class="card">
-    <h2>Recent Reports</h2>
-    <table>
+    <h2>🔍 All Reports
+        <a href="/export/reports" class="btn btn-success" style="float: right; text-decoration: none;">📥 Export CSV</a>
+    </h2>
+    
+    <form method="get" action="/" class="filter-section" style="margin-top: 1rem;">
+        <div class="filter-grid">
+            <div class="form-group">
+                <label for="search">Search</label>
+                <input type="text" id="search" name="search" value="{{ search }}" 
+                       placeholder="Report ID, Organization, Domain...">
+            </div>
+            
+            <div class="form-group">
+                <label for="domain">Domain</label>
+                <select id="domain" name="domain">
+                    <option value="">All Domains</option>
+                    {% for d in all_domains %}
+                    <option value="{{ d }}" {% if domain_filter == d %}selected{% endif %}>{{ d }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="org">Organization</label>
+                <select id="org" name="org">
+                    <option value="">All Organizations</option>
+                    {% for o in all_orgs %}
+                    <option value="{{ o }}" {% if org_filter == o %}selected{% endif %}>{{ o }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="date_from">Date From</label>
+                <input type="date" id="date_from" name="date_from" value="{{ date_from }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="date_to">Date To</label>
+                <input type="date" id="date_to" name="date_to" value="{{ date_to }}">
+            </div>
+        </div>
+        
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-primary">🔍 Apply Filters</button>
+            <a href="/" class="btn btn-secondary">🔄 Clear</a>
+            <small style="margin-left: auto;">Showing {{ recent_reports|length }} of {{ total_filtered }} filtered reports</small>
+        </div>
+    </form>
+    
+    {% if recent_reports %}
+    <table style="margin-top: 1rem;">
         <thead>
             <tr>
                 <th>ID</th>
@@ -116,12 +186,13 @@
                 <th>Date Range</th>
                 <th>Records</th>
                 <th>Messages</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             {% for report in recent_reports %}
             <tr>
-                <td><a href="/report/{{ report.id }}">{{ report.id }}</a></td>
+                <td><a href="/report/{{ report.id }}">#{{ report.id }}</a></td>
                 <td>{{ report.org_name }}</td>
                 <td><a href="/domain/{{ report.domain }}">{{ report.domain }}</a></td>
                 <td>
@@ -130,16 +201,62 @@
                 </td>
                 <td>{{ report.record_count }}</td>
                 <td>{{ '{:,}'.format(report.message_count or 0) }}</td>
+                <td>
+                    <a href="/report/{{ report.id }}" class="btn btn-primary" style="padding: 0.25rem 0.75rem; text-decoration: none;">View</a>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+    
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="?page={{ page - 1 }}{% if search %}&search={{ search }}{% endif %}{% if domain_filter %}&domain={{ domain_filter }}{% endif %}{% if org_filter %}&org={{ org_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">‹ Previous</a>
+        {% else %}
+        <span class="disabled">‹ Previous</span>
+        {% endif %}
+        
+        <span style="margin: 0 10px;">
+            Page 
+            <select id="pageSelect" style="padding: 5px 10px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer;">
+                {% for p in range(1, total_pages + 1) %}
+                <option value="{{ p }}" {% if p == page %}selected{% endif %}>{{ p }}</option>
+                {% endfor %}
+            </select>
+            of {{ total_pages }}
+        </span>
+        
+        {% if page < total_pages %}
+        <a href="?page={{ page + 1 }}{% if search %}&search={{ search }}{% endif %}{% if domain_filter %}&domain={{ domain_filter }}{% endif %}{% if org_filter %}&org={{ org_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Next ›</a>
+        {% else %}
+        <span class="disabled">Next ›</span>
+        {% endif %}
+    </div>
+    
+    <script>
+    document.getElementById('pageSelect').addEventListener('change', function() {
+        var page = this.value;
+        var url = '?page=' + page;
+        {% if search %}url += '&search={{ search }}';{% endif %}
+        {% if domain_filter %}url += '&domain={{ domain_filter }}';{% endif %}
+        {% if org_filter %}url += '&org={{ org_filter }}';{% endif %}
+        {% if date_from %}url += '&date_from={{ date_from }}';{% endif %}
+        {% if date_to %}url += '&date_to={{ date_to }}';{% endif %}
+        window.location.href = url;
+    });
+    </script>
+    {% endif %}
+    
+    {% else %}
+    <p style="text-align: center; padding: 2rem; color: #7f8c8d;">No reports found matching your filters.</p>
+    {% endif %}
 </div>
-{% endif %}
 
 {% if not overall_stats.total_reports %}
 <div class="card">
-    <h2>No Data Available</h2>
+    <h2>🚀 Getting Started</h2>
     <p>No DMARC reports have been imported yet. Start by:</p>
     <ul style="margin-left: 2rem; margin-top: 1rem;">
         <li>Configuring the IMAP fetcher to automatically retrieve reports</li>
@@ -148,4 +265,92 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block extra_js %}
+{% if disposition_stats %}
+// Disposition Pie Chart
+const dispositionCtx = document.getElementById('dispositionChart').getContext('2d');
+const dispositionChart = new Chart(dispositionCtx, {
+    type: 'pie',
+    data: {
+        labels: [
+            {% for stat in disposition_stats %}
+            '{{ stat.disposition|capitalize }}'{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ],
+        datasets: [{
+            data: [
+                {% for stat in disposition_stats %}
+                {{ stat.total }}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            backgroundColor: [
+                {% for stat in disposition_stats %}
+                {% if stat.disposition == 'none' %}'#27ae60'{% elif stat.disposition == 'quarantine' %}'#f39c12'{% else %}'#e74c3c'{% endif %}{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+{% endif %}
+
+// Timeline Chart
+fetch('/api/timeline?days=30')
+    .then(response => response.json())
+    .then(data => {
+        const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+        const timelineChart = new Chart(timelineCtx, {
+            type: 'line',
+            data: {
+                labels: data.map(d => d.report_date),
+                datasets: [
+                    {
+                        label: 'Passed',
+                        data: data.map(d => d.passed),
+                        borderColor: '#27ae60',
+                        backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Quarantined',
+                        data: data.map(d => d.quarantined),
+                        borderColor: '#f39c12',
+                        backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Rejected',
+                        data: data.map(d => d.rejected),
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    });
 {% endblock %}

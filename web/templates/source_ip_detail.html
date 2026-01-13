@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block title %}{{ ip }} - Source IP Detail{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <h1>🌐 Source IP: <span class="code">{{ ip }}</span></h1>
+    <a href="/source-ips" class="btn btn-secondary" style="text-decoration: none;">&larr; Back to All IPs</a>
+</div>
+
+<div class="card" style="background: #e8f4f8; border-left: 4px solid #3498db;">
+    <h3 style="margin-bottom: 0.5rem;">💡 Understanding This IP</h3>
+    <p style="margin: 0; color: #2c3e50;">
+        This page shows the complete history of <strong>{{ ip }}</strong> across all DMARC reports.
+        You can see exactly which days this IP sent emails and how they were authenticated.
+    </p>
+</div>
+
+<!-- Summary Statistics -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>Total Messages</h3>
+        <div class="value">{{ '{:,}'.format(ip_summary.total_messages) }}</div>
+        <div class="subtext">Across {{ ip_summary.report_count }} reports</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Primary Domain</h3>
+        <div class="value" style="font-size: 1.3rem;">{{ ip_summary.domain }}</div>
+        <div class="subtext"><a href="/domain/{{ ip_summary.domain }}">View domain details</a></div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>DKIM Pass Rate</h3>
+        {% set dkim_rate = (ip_summary.dkim_pass / ip_summary.total_messages * 100) if ip_summary.total_messages > 0 else 0 %}
+        <div class="value" style="color: {% if dkim_rate >= 80 %}#27ae60{% elif dkim_rate >= 50 %}#f39c12{% else %}#e74c3c{% endif %}">
+            {{ '%.1f'|format(dkim_rate) }}%
+        </div>
+        <div class="subtext">{{ '{:,}'.format(ip_summary.dkim_pass) }} of {{ '{:,}'.format(ip_summary.total_messages) }}</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>SPF Pass Rate</h3>
+        {% set spf_rate = (ip_summary.spf_pass / ip_summary.total_messages * 100) if ip_summary.total_messages > 0 else 0 %}
+        <div class="value" style="color: {% if spf_rate >= 80 %}#27ae60{% elif spf_rate >= 50 %}#f39c12{% else %}#e74c3c{% endif %}">
+            {{ '%.1f'|format(spf_rate) }}%
+        </div>
+        <div class="subtext">{{ '{:,}'.format(ip_summary.spf_pass) }} of {{ '{:,}'.format(ip_summary.total_messages) }}</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>First Seen</h3>
+        {% if timeline %}
+        <div class="value" style="font-size: 1.2rem;">{{ timeline[-1].report_date }}</div>
+        {% endif %}
+    </div>
+    
+    <div class="stat-card">
+        <h3>Last Seen</h3>
+        <div class="value" style="font-size: 1.2rem;">{{ ip_summary.last_seen|datetime }}</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Health Status</h3>
+        {% set avg_rate = (dkim_rate + spf_rate) / 2 %}
+        <div class="value" style="font-size: 1.2rem;">
+            {% if avg_rate >= 80 %}
+            <span class="badge badge-success" style="font-size: 1rem;">✓ Healthy</span>
+            {% elif avg_rate >= 50 %}
+            <span class="badge badge-warning" style="font-size: 1rem;">⚠ Warning</span>
+            {% else %}
+            <span class="badge badge-danger" style="font-size: 1rem;">✗ Poor</span>
+            {% endif %}
+        </div>
+        <div class="subtext">Overall: {{ '%.1f'|format(avg_rate) }}%</div>
+    </div>
+</div>
+
+<!-- Timeline Chart -->
+{% if timeline %}
+<div class="card">
+    <h2>📈 Activity Timeline (Last 90 Days)</h2>
+    <div class="chart-container" style="height: 250px;">
+        <canvas id="timelineChart"></canvas>
+    </div>
+</div>
+{% endif %}
+
+<!-- Daily Breakdown -->
+{% if timeline %}
+<div class="card">
+    <h2>📅 Daily Activity Breakdown</h2>
+    <p style="color: #7f8c8d; margin-bottom: 1rem;">
+        This shows exactly which days this IP appeared in DMARC reports and how messages were authenticated.
+    </p>
+    <table>
+        <thead>
+            <tr>
+                <th>Report Date</th>
+                <th>Messages</th>
+                <th>DKIM Pass</th>
+                <th>SPF Pass</th>
+                <th>Disposition</th>
+                <th>Auth Health</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for day in timeline %}
+            {% set day_dkim_rate = (day.dkim_pass / day.total_messages * 100) if day.total_messages > 0 else 0 %}
+            {% set day_spf_rate = (day.spf_pass / day.total_messages * 100) if day.total_messages > 0 else 0 %}
+            <tr>
+                <td><strong>{{ day.report_date }}</strong></td>
+                <td>{{ '{:,}'.format(day.total_messages) }}</td>
+                <td>
+                    <span class="badge {% if day_dkim_rate >= 80 %}badge-success{% elif day_dkim_rate >= 50 %}badge-warning{% else %}badge-danger{% endif %}">
+                        {{ '{:,}'.format(day.dkim_pass) }} ({{ '%.0f'|format(day_dkim_rate) }}%)
+                    </span>
+                </td>
+                <td>
+                    <span class="badge {% if day_spf_rate >= 80 %}badge-success{% elif day_spf_rate >= 50 %}badge-warning{% else %}badge-danger{% endif %}">
+                        {{ '{:,}'.format(day.spf_pass) }} ({{ '%.0f'|format(day_spf_rate) }}%)
+                    </span>
+                </td>
+                <td>
+                    <small>
+                        Pass: {{ '{:,}'.format(day.passed) }} | 
+                        Fail: {{ '{:,}'.format(day.failed) }}
+                    </small>
+                </td>
+                <td>
+                    {% set day_avg = (day_dkim_rate + day_spf_rate) / 2 %}
+                    {% if day_avg >= 80 %}
+                    <span class="badge badge-success">✓</span>
+                    {% elif day_avg >= 50 %}
+                    <span class="badge badge-warning">⚠</span>
+                    {% else %}
+                    <span class="badge badge-danger">✗</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Detailed Records with Report Links -->
+<div class="card">
+    <h2>📋 All Records from This IP ({{ records|length }} records)</h2>
+    <p style="color: #7f8c8d; margin-bottom: 1rem;">
+        These are the individual records from DMARC reports where this IP appeared. 
+        Click the Report ID to see the full report.
+    </p>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Report Date</th>
+                <th>Report ID</th>
+                <th>Organization</th>
+                <th>Messages</th>
+                <th>Disposition</th>
+                <th>DKIM</th>
+                <th>SPF</th>
+                <th>Domain</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in records %}
+            <tr>
+                <td>
+                    <strong>{{ record.date_range_begin|datetime }}</strong><br>
+                    <small>to {{ record.date_range_end|datetime }}</small>
+                </td>
+                <td>
+                    <a href="/report/{{ record.report_id }}" style="font-weight: 600;">
+                        #{{ record.report_id }}
+                    </a>
+                </td>
+                <td>{{ record.org_name }}</td>
+                <td><strong>{{ '{:,}'.format(record.count) }}</strong></td>
+                <td>
+                    {% if record.disposition == 'none' %}
+                    <span class="badge badge-success">{{ record.disposition }}</span>
+                    {% elif record.disposition == 'quarantine' %}
+                    <span class="badge badge-warning">{{ record.disposition }}</span>
+                    {% else %}
+                    <span class="badge badge-danger">{{ record.disposition }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if record.dkim_result == 'pass' %}
+                    <span class="badge badge-success">✓ pass</span>
+                    {% else %}
+                    <span class="badge badge-danger">✗ {{ record.dkim_result }}</span>
+                    {% endif %}
+                    {% if record.dkim_details %}
+                    <br><small>{{ record.dkim_details }}</small>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if record.spf_result == 'pass' %}
+                    <span class="badge badge-success">✓ pass</span>
+                    {% else %}
+                    <span class="badge badge-danger">✗ {{ record.spf_result }}</span>
+                    {% endif %}
+                    {% if record.spf_details %}
+                    <br><small>{{ record.spf_details }}</small>
+                    {% endif %}
+                </td>
+                <td>{{ record.header_from }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Analysis and Recommendations -->
+<div class="card" style="background: {% if avg_rate >= 80 %}#d4edda{% elif avg_rate >= 50 %}#fff3cd{% else %}#f8d7da{% endif %}; 
+                                     border-left: 4px solid {% if avg_rate >= 80 %}#27ae60{% elif avg_rate >= 50 %}#f39c12{% else %}#e74c3c{% endif %};">
+    <h3 style="margin-bottom: 0.5rem;">💡 Analysis & Recommendations</h3>
+    {% if avg_rate >= 80 %}
+    <p><strong>✓ This IP appears legitimate and properly configured.</strong></p>
+    <ul style="margin: 0.5rem 0; padding-left: 2rem;">
+        <li>High authentication pass rates indicate proper DKIM and SPF setup</li>
+        <li>Continue monitoring for any changes in behavior</li>
+        <li>This IP can be considered trusted for domain {{ ip_summary.domain }}</li>
+    </ul>
+    {% elif avg_rate >= 50 %}
+    <p><strong>⚠ This IP has moderate authentication issues.</strong></p>
+    <ul style="margin: 0.5rem 0; padding-left: 2rem;">
+        <li>Review DKIM signature configuration if DKIM pass rate is low</li>
+        <li>Verify SPF record includes this IP if SPF is failing</li>
+        <li>Check if this is a legitimate mail server for your domain</li>
+        <li>Monitor closely for improvements or further degradation</li>
+    </ul>
+    {% else %}
+    <p><strong>✗ This IP has serious authentication problems.</strong></p>
+    <ul style="margin: 0.5rem 0; padding-left: 2rem;">
+        <li><strong>Action Required:</strong> Investigate if this is an authorized sender</li>
+        <li>Low pass rates may indicate spoofing or unauthorized use</li>
+        <li>If unauthorized: Consider blocking or reporting</li>
+        <li>If authorized: Fix DKIM/SPF configuration immediately</li>
+        <li>Review all {{ records|length }} records above to identify patterns</li>
+    </ul>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{% if timeline %}
+// Timeline Chart for this IP
+fetch('/api/timeline?days=90&ip={{ ip }}')
+    .then(response => response.json())
+    .then(data => {
+        const ctx = document.getElementById('timelineChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.map(d => d.report_date),
+                datasets: [
+                    {
+                        label: 'Total Messages',
+                        data: data.map(d => d.total_messages),
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'DKIM Pass',
+                        data: data.map(d => d.dkim_pass),
+                        borderColor: '#27ae60',
+                        backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'SPF Pass',
+                        data: data.map(d => d.spf_pass),
+                        borderColor: '#2ecc71',
+                        backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                const total = data[idx].total_messages;
+                                if (context.dataset.label === 'DKIM Pass') {
+                                    const rate = (data[idx].dkim_pass / total * 100).toFixed(1);
+                                    return `Rate: ${rate}%`;
+                                } else if (context.dataset.label === 'SPF Pass') {
+                                    const rate = (data[idx].spf_pass / total * 100).toFixed(1);
+                                    return `Rate: ${rate}%`;
+                                }
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    });
+{% endif %}
+{% endblock %}

@@ -7,12 +7,18 @@ A comprehensive DMARC report analyzer system that fetches reports from IMAP, sto
 - **Automated IMAP Fetching**: Periodically fetches DMARC reports from an IMAP mailbox
 - **Manual Import**: Import DMARC reports from local ZIP/GZ/XML files for testing
 - **PostgreSQL Storage**: Stores parsed DMARC data in a relational database
-- **Web Dashboard**: 
-  - Overview statistics and metrics
-  - Domain-specific analysis
-  - Source IP tracking
-  - Authentication results (DKIM, SPF)
-  - Detailed report views with raw XML
+- **Advanced Web Dashboard**: 
+  - **Interactive Charts**: Visual analytics with Chart.js (disposition breakdown, timeline trends, authentication results)
+  - **Search & Filter**: Multi-criteria filtering by domain, organization, date range, IP, and authentication status
+  - **Pagination**: Easy navigation through large report datasets
+  - **Detailed Analysis**: Deep dive into individual reports with filterable record tables
+  - **Source IP Deep Dive**: Click any IP to see complete history with dates and reports
+  - **Export Capabilities**: CSV export for reports and individual record details
+  - **Real-time Statistics**: Overall metrics, domain-specific analysis, source IP tracking
+  - **Authentication Tracking**: DKIM and SPF validation results with detailed breakdowns
+  - **Automated Insights**: Smart recommendations for security issues and misconfigurations
+  - **DMARC Guide**: Built-in comprehensive guide to understand and interpret reports
+  - **Raw XML Access**: View original report XML for debugging
 - **Docker-based**: Easy deployment with Docker Compose
 
 ## System Architecture
@@ -92,10 +98,79 @@ Views:
 
 ## API Endpoints
 
-The web application also provides JSON API endpoints:
+The web application provides JSON API endpoints and export functionality:
 
+### JSON APIs
 - `GET /api/stats` - Overall statistics
 - `GET /api/domains` - List of all domains with statistics
+- `GET /api/timeline?days=30` - Timeline chart data (message trends over time)
+
+### Export Endpoints
+- `GET /export/reports` - Export all reports to CSV
+- `GET /export/records/<report_id>` - Export specific report records to CSV
+
+### Web Interface Features
+
+#### Dashboard (/)
+- **Overview Statistics**: Total reports, domains, messages, and unique source IPs
+- **Interactive Charts**: 
+  - Pie chart for message disposition distribution
+  - Line chart showing 30-day trend
+- **Search & Filter**: 
+  - Keyword search across report ID, organization, and domain
+  - Filter by specific domain or organization
+  - Date range filtering
+- **Pagination**: Navigate through large datasets (20 reports per page)
+- **Quick Actions**: Export all reports to CSV
+
+#### Report Detail (/report/<id>)
+- **Comprehensive Metadata**: Organization, domain, policy configuration
+- **Visual Analytics**: Charts for disposition and authentication results
+- **Filterable Records Table**: 
+  - Filter by source IP, disposition, DKIM result, or SPF result
+  - Real-time client-side filtering
+  - Detailed authentication information
+- **Export**: Download report records as CSV
+- **Raw XML**: Access to original report data
+
+#### Source IP Analysis (/source-ips)
+- **Overview of All Source IPs**: Top 100 IPs by message volume
+- **Filter Capabilities**:
+  - Filter by IP address
+  - Filter by domain
+  - Filter by authentication health (Good/Warning/Poor)
+- **Health Indicators**: Color-coded authentication pass rates
+- **Click to Deep Dive**: View complete IP history
+
+#### Source IP Detail (/source-ip/<ip>)
+- **Complete IP History**: See all dates this IP appeared in reports
+- **Timeline Chart**: Visual representation of activity over 90 days
+- **Daily Breakdown**: Day-by-day authentication results
+- **Report Links**: Click to view the full report for any date
+- **Health Analysis**: Automatic recommendations based on authentication rates
+- **Authentication Tracking**: DKIM/SPF pass rates by date
+
+#### Insights & Recommendations (/insights)
+- **Automated Analysis**: System automatically identifies issues
+- **Severity-based Categorization**: Critical, Warning, Info levels
+- **Specific Recommendations**: Actionable steps for each issue
+- **Issue Detection**:
+  - High failure rate domains
+  - Problematic source IPs
+  - Weak DMARC policies
+  - Missing reports
+
+#### DMARC Guide (/guide)
+- **Comprehensive Documentation**: Understand DMARC, DKIM, SPF
+- **Common Scenarios**: Real-world examples with solutions
+- **Quick Reference**: Key metrics and what to look for
+- **Step-by-Step Workflows**: Weekly monitoring checklist
+- **Color-coded Examples**: Easy-to-understand explanations
+
+#### Domain Analysis (/domain/<domain>)
+- Domain-specific statistics and trends
+- Source IP analysis for the domain
+- Historical report timeline
 
 Example:
 ```bash
