@@ -192,7 +192,31 @@
                     <span class="badge badge-danger">✗ {{ record.spf_result }}</span>
                     {% endif %}
                 </td>
-                <td>{{ record.header_from }}</td>
+                <td>
+                    {{ record.header_from }}
+                    {% set is_relay = namespace(found=false, domains=[]) %}
+                    {% if record.dkim_details %}
+                        {% for detail in record.dkim_details %}
+                            {% set domain = detail.split(' (')[0] %}
+                            {% if domain != record.header_from and 'pass' in detail %}
+                                {% set is_relay.found = true %}
+                                {% set _ = is_relay.domains.append(domain) %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                    {% if record.spf_details %}
+                        {% for detail in record.spf_details %}
+                            {% set domain = detail.split(' (')[0] %}
+                            {% if domain != record.header_from and 'pass' in detail and domain not in is_relay.domains %}
+                                {% set is_relay.found = true %}
+                                {% set _ = is_relay.domains.append(domain) %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                    {% if is_relay.found %}
+                        <br><span class="badge" style="background: #9b59b6; color: white; margin-top: 4px;">🔄 Relay via: {{ is_relay.domains|join(', ') }}</span>
+                    {% endif %}
+                </td>
                 <td>
                     {% if record.dkim_details %}
                     <details style="cursor: pointer;">

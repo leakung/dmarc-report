@@ -208,7 +208,35 @@
                     <br><small>{{ record.spf_details }}</small>
                     {% endif %}
                 </td>
-                <td>{{ record.header_from }}</td>
+                <td>
+                    {{ record.header_from }}
+                    {% set is_relay = namespace(found=false, domains=[]) %}
+                    {% if record.dkim_details %}
+                        {% for detail in record.dkim_details.split(', ') %}
+                            {% set domain = detail.split(' (')[0] %}
+                            {% if domain != record.header_from and 'pass' in detail %}
+                                {% set is_relay.found = true %}
+                                {% if domain not in is_relay.domains %}
+                                    {% set _ = is_relay.domains.append(domain) %}
+                                {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                    {% if record.spf_details %}
+                        {% for detail in record.spf_details.split(', ') %}
+                            {% set domain = detail.split(' (')[0] %}
+                            {% if domain != record.header_from and 'pass' in detail %}
+                                {% set is_relay.found = true %}
+                                {% if domain not in is_relay.domains %}
+                                    {% set _ = is_relay.domains.append(domain) %}
+                                {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                    {% if is_relay.found %}
+                        <br><span class="badge" style="background: #9b59b6; color: white; margin-top: 4px; font-size: 0.75rem;">🔄 Relay via: {{ is_relay.domains|join(', ') }}</span>
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>
