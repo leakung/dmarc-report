@@ -48,6 +48,7 @@ services:
       IMAP_PASSWORD: ${IMAP_PASSWORD}
       IMAP_FOLDER: ${IMAP_FOLDER:-INBOX}
       FETCH_INTERVAL: ${FETCH_INTERVAL:-3600}
+      FETCH_DAYS_LIMIT: ${FETCH_DAYS_LIMIT:-3}
     depends_on:
       - postgres
     volumes:

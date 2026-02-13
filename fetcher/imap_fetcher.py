@@ -13,7 +13,7 @@ import gzip
 import zipfile
 import io
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timedelta
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import logging
@@ -263,12 +263,13 @@ class DatabaseManager:
 class IMAPFetcher:
     """Fetch DMARC reports from IMAP server"""
     
-    def __init__(self, server, port, user, password, folder='INBOX'):
+    def __init__(self, server, port, user, password, folder='INBOX', days_limit=None):
         self.server = server
         self.port = port
         self.user = user
         self.password = password
         self.folder = folder
+        self.days_limit = days_limit
         self.parser = DMARCParser()
     
     def connect(self):
@@ -318,11 +319,23 @@ class IMAPFetcher:
         processed_count = 0
         
         try:
-            # Search for all emails
-            status, messages = mail.search(None, 'ALL')
+            # Build search criteria based on days_limit
+            if self.days_limit:
+                since_date = datetime.now() - timedelta(days=self.days_limit)
+                date_str = since_date.strftime('%d-%b-%Y')
+                search_criteria = f'(SINCE {date_str})'
+                logger.info(f"Searching emails since {date_str} (last {self.days_limit} days)")
+            else:
+                search_criteria = 'ALL'
+                logger.info("Searching all emails")
+            
+            status, messages = mail.search(None, search_criteria)
             email_ids = messages[0].split()
             
-            logger.info(f"Found {len(email_ids)} emails")
+            if self.days_limit:
+                logger.info(f"Found {len(email_ids)} emails from the last {self.days_limit} days (since {date_str})")
+            else:
+                logger.info(f"Found {len(email_ids)} emails (all emails)")
             
             for email_id in email_ids:
                 try:
@@ -386,16 +399,26 @@ def main():
     imap_password = os.environ.get('IMAP_PASSWORD')
     imap_folder = os.environ.get('IMAP_FOLDER', 'INBOX')
     fetch_interval = int(os.environ.get('FETCH_INTERVAL', 3600))
+    fetch_days_limit = os.environ.get('FETCH_DAYS_LIMIT')
+    
+    # Convert days limit to integer if provided
+    if fetch_days_limit:
+        try:
+            fetch_days_limit = int(fetch_days_limit)
+            logger.info(f"Email fetch limited to last {fetch_days_limit} days")
+        except ValueError:
+            logger.warning(f"Invalid FETCH_DAYS_LIMIT value: {fetch_days_limit}, ignoring")
+            fetch_days_limit = None
     
     if not all([db_url, imap_server, imap_user, imap_password]):
         logger.error("Missing required environment variables")
         return
     
     db_manager = DatabaseManager(db_url)
-    fetcher = IMAPFetcher(imap_server, imap_port, imap_user, imap_password, imap_folder)
-    
+    fetcher = IMAPFetcher(imap_server, imap_port, imap_user, imap_password, imap_folder, fetch_days_limit)
+
     logger.info("DMARC IMAP Fetcher started")
-    
+
     while True:
         try:
             logger.info("Starting fetch cycle")
