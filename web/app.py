@@ -134,6 +134,7 @@ def index():
             cur.execute(f"""
                 SELECT 
                     r.id,
+                    r.report_id,
                     r.org_name,
                     r.domain,
                     r.date_range_begin,
@@ -192,23 +193,23 @@ def index():
         conn.close()
 
 
-@app.route('/report/<int:report_id>')
+@app.route('/report/<report_id>')
 @requires_auth
 def report_detail(report_id):
     """Detailed view of a single report"""
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Get report metadata
+            # Get report metadata using external report_id (string)
             cur.execute("""
-                SELECT * FROM reports WHERE id = %s
+                SELECT * FROM reports WHERE report_id = %s
             """, (report_id,))
             report = cur.fetchone()
             
             if not report:
                 return "Report not found", 404
             
-            # Get records
+            # Get records using internal id
             cur.execute("""
                 SELECT 
                     r.*,
@@ -222,10 +223,10 @@ def report_detail(report_id):
                 WHERE r.report_id = %s
                 GROUP BY r.id
                 ORDER BY r.count DESC
-            """, (report_id,))
+            """, (report['id'],))
             records = cur.fetchall()
             
-            # Get summary statistics
+            # Get summary statistics using internal id
             cur.execute("""
                 SELECT 
                     SUM(count) as total_messages,
@@ -237,7 +238,7 @@ def report_detail(report_id):
                     SUM(CASE WHEN spf_result = 'pass' THEN count ELSE 0 END) as spf_pass
                 FROM records
                 WHERE report_id = %s
-            """, (report_id,))
+            """, (report['id'],))
             summary = cur.fetchone()
             
             return render_template(
@@ -278,6 +279,7 @@ def domain_detail(domain):
             cur.execute("""
                 SELECT 
                     r.id,
+                    r.report_id,
                     r.org_name,
                     r.date_range_begin,
                     r.date_range_end,
@@ -370,7 +372,7 @@ def source_ip_detail(ip):
             # Get detailed records with report dates
             cur.execute("""
                 SELECT 
-                    r.id as report_id,
+                    r.id as internal_id,
                     r.org_name,
                     r.report_id,
                     r.date_range_begin,
@@ -694,7 +696,7 @@ def export_reports():
         conn.close()
 
 
-@app.route('/export/records/<int:report_id>')
+@app.route('/export/records/<report_id>')
 @requires_auth
 def export_report_records(report_id):
     """Export specific report records to CSV"""
@@ -704,6 +706,14 @@ def export_report_records(report_id):
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Get internal id from external report_id
+            cur.execute("SELECT id FROM reports WHERE report_id = %s", (report_id,))
+            report = cur.fetchone()
+            if not report:
+                return "Report not found", 404
+            
+            internal_id = report['id']
+            
             cur.execute("""
                 SELECT 
                     r.*,
@@ -715,7 +725,7 @@ def export_report_records(report_id):
                 WHERE r.report_id = %s
                 GROUP BY r.id
                 ORDER BY r.count DESC
-            """, (report_id,))
+            """, (internal_id,))
             records = cur.fetchall()
             
             output = StringIO()

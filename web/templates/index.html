@@ -192,7 +192,7 @@
         <tbody>
             {% for report in recent_reports %}
             <tr>
-                <td><a href="/report/{{ report.id }}">#{{ report.id }}</a></td>
+                <td><a href="/report/{{ report.report_id }}">#{{ report.id }}</a></td>
                 <td>{{ report.org_name }}</td>
                 <td><a href="/domain/{{ report.domain }}">{{ report.domain }}</a></td>
                 <td>
@@ -202,7 +202,7 @@
                 <td>{{ report.record_count }}</td>
                 <td>{{ '{:,}'.format(report.message_count or 0) }}</td>
                 <td>
-                    <a href="/report/{{ report.id }}" class="btn btn-primary" style="padding: 0.25rem 0.75rem; text-decoration: none;">View</a>
+                    <a href="/report/{{ report.report_id }}" class="btn btn-primary" style="padding: 0.25rem 0.75rem; text-decoration: none;">View</a>
                 </td>
             </tr>
             {% endfor %}
